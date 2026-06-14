@@ -4,8 +4,9 @@ Never-stale SQL result cache for AI agents on Postgres. Caches query results and
 uses Postgres's own WAL (logical decoding) to invalidate precisely the instant
 the underlying data changes — cached or live, the answer always matches the DB.
 
-Proven over four escalating tests (`benchmarks/`, write-up in `../../VERDICT.md`):
-**0 stale across 153,015 live-checked hits**, including a real out-of-band Postgres.
+Proven over four escalating tests (the differential fuzzer + spikes in
+`benchmarks/`): **0 stale across 153,015 live-checked hits**, including a real
+out-of-band Postgres.
 
 ## Layout
 ```
