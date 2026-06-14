@@ -1,0 +1,13 @@
+corpus_cache/
+__pycache__/
+*.pyc
+
+# js / monorepo
+node_modules/
+.next/
+dist/
+.astro/
+.turbo/
+*.tsbuildinfo
+.env
+.env.local

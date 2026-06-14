@@ -1,0 +1,15 @@
+# Build context for quickstart/Dockerfile is the repo root. Keep it lean: the
+# demo image only needs packages/core + quickstart/. Everything below is large
+# or irrelevant to the build, and sending it would slow the first `up`.
+.git
+**/node_modules
+**/__pycache__
+**/*.pyc
+.venv
+**/.venv
+apps
+pnpm-lock.yaml
+**/.next
+**/dist
+**/.turbo
+**/*.egg-info

@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cartograph-cache"
+version = "0.1.0"
+description = "Never-stale SQL result cache for AI agents on Postgres (MCP-native)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Cartograph" }]
+keywords = ["postgres", "cache", "mcp", "agents", "wal", "logical-decoding"]
+dependencies = [
+  "sqlglot>=25",
+  "psycopg2-binary>=2.9",
+  "mcp>=1.2",
+]
+
+[project.optional-dependencies]
+api = ["fastapi>=0.110", "uvicorn>=0.27"]
+dev = ["pytest>=8", "ruff>=0.5", "fastapi>=0.110", "uvicorn>=0.27"]
+
+[project.scripts]
+cartograph-mcp = "cartograph.mcp_server:run"
+cartograph-api = "cartograph.api:run"
+cartograph-doctor = "cartograph.provision:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cartograph"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

@@ -1,0 +1,11 @@
+# Keep container-facing and script files LF on every platform. CRLF in these
+# breaks (or warns) inside Linux containers and shell tooling, regardless of a
+# contributor's core.autocrlf setting.
+*.sh            text eol=lf
+Dockerfile      text eol=lf
+*.Dockerfile    text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+*.py            text eol=lf
+.dockerignore   text eol=lf
+.gitattributes  text eol=lf

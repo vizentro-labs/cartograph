@@ -1,0 +1,47 @@
+# Cartograph zero-config quickstart.
+#
+#   docker compose -f quickstart/docker-compose.yml up --build
+#
+# Spins up a throwaway, pre-seeded sample Postgres (wal_level=logical) AND
+# Cartograph wired to it, then runs a ~60s scripted demo proving the never-stale
+# guarantee. Nothing here touches your own database. Tear down with:
+#
+#   docker compose -f quickstart/docker-compose.yml down -v
+
+services:
+  # The sample database. Logical decoding is enabled at startup so Cartograph
+  # can create its replication slot with zero configuration from the user.
+  db:
+    image: postgres:16
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    # No published port: this is a self-contained, throwaway demo DB.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    tmpfs:
+      - /var/lib/postgresql/data   # ephemeral — every `up` is a clean slate
+
+  # Cartograph + the dramatic demo runner. Built from the repo root so it can
+  # install the proven core (packages/core) unchanged.
+  cartograph:
+    build:
+      context: ..
+      dockerfile: quickstart/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # The only wiring the user never has to think about: one DSN, pointed at
+      # the sample DB on the compose network. No slot/WAL/permissions setup.
+      CARTOGRAPH_DSN: "host=db port=5432 dbname=postgres user=postgres password=postgres"
+      CARTOGRAPH_MODE: "coarse"
+      # Set NO_COLOR=1 or CARTOGRAPH_DEMO_PACE=0 to flatten the output for logs/CI.
+    tty: true
