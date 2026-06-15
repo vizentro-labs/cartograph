@@ -1,0 +1,58 @@
+name: CD
+
+# Runs after merge to main ("delivery"): build the distribution, and publish to
+# PyPI when you cut a GitHub Release.
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build sdist + wheel
+        working-directory: packages/core
+        run: |
+          pip install build
+          python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: packages/core/dist/*
+
+  Publish:
+    name: Publish to PyPI
+    needs: Build
+    # Only on a published GitHub Release — normal pushes to main just build.
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    # Requires a PyPI "trusted publisher" configured for this repo + a GitHub
+    # environment named `pypi`. Until that's set up, this job only runs on a
+    # release, so day-to-day CD stays green with no secrets.
+    environment: pypi
+    permissions:
+      id-token: write   # OIDC for PyPI trusted publishing (no API token needed)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build
+        working-directory: packages/core
+        run: |
+          pip install build
+          python -m build
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/core/dist/

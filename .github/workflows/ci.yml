@@ -1,16 +1,16 @@
-name: ci
+name: CI
 
+# Runs on pull requests (the "integration" gate before merge).
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  lint:
+  Lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,7 +22,7 @@ jobs:
         working-directory: packages/core
         run: ruff check src
 
-  test:
+  Test:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
