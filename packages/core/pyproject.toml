@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 api = ["fastapi>=0.110", "uvicorn>=0.27"]
+otel = ["opentelemetry-api>=1.20", "opentelemetry-sdk>=1.20", "opentelemetry-exporter-otlp>=1.20"]
 dev = ["pytest>=8", "ruff>=0.5", "fastapi>=0.110", "uvicorn>=0.27"]
 
 [project.scripts]

@@ -17,6 +17,7 @@ from decimal import Decimal
 from . import config
 from .runtime import Cache
 from .change_source import ChangeSource, PostgresChangeSource
+from .telemetry import Telemetry
 
 
 @dataclass
@@ -68,7 +69,10 @@ class Cartograph:
         self._cache = Cache(self._ver, self._src.read_schema())
         self._qconn = self._src.query_connection()    # query connection
         self._stats = {"queries": 0, "hits": 0, "misses": 0, "refused": 0,
-                       "refusals_by_reason": {}, "stale_count": 0}
+                       "invalidations": 0, "refusals_by_reason": {}, "stale_count": 0,
+                       "db_ms_saved": 0.0, "db_ms_spent": 0.0}
+        self._live_ms = {}                 # sql -> last measured live execution time (ms)
+        self._tel = Telemetry()            # optional OpenTelemetry metrics (no-op if absent)
         self._events = deque(maxlen=200)   # invalidation / serve feed for the dashboard
 
     def _emit(self, kind, detail, source):
@@ -105,9 +109,13 @@ class Cartograph:
         return "row" if fp[0] == "row" else self.mode
 
     def _execute(self, sql):
+        """Run a query live; return (rows, elapsed_ms) so we can measure the
+        compute a later cache hit avoids."""
         cur = self._qconn.cursor()
+        t0 = time.perf_counter()
         cur.execute(sql)
-        return cur.fetchall()
+        rows = cur.fetchall()
+        return rows, (time.perf_counter() - t0) * 1000.0
 
     # ---- public API ----
     def query(self, sql):
@@ -123,7 +131,9 @@ class Cartograph:
             self._stats["refused"] += 1
             self._stats["refusals_by_reason"][fp[1]] = \
                 self._stats["refusals_by_reason"].get(fp[1], 0) + 1
-            rows = self._execute(sql)
+            rows, ms = self._execute(sql)
+            self._stats["db_ms_spent"] += ms
+            self._tel.refused(ms)
             self._emit(f"refused:{fp[1]}", label, "live")
             return QueryResult(_json_rows(rows), "live", f"refused:{fp[1]}", as_of)
 
@@ -131,14 +141,22 @@ class Cartograph:
         served, hit = self._cache.lookup(sql, self._qconn)
         if hit:
             self._stats["hits"] += 1
+            saved = self._live_ms.get(sql, 0.0)   # compute this hit avoided
+            self._stats["db_ms_saved"] += saved
+            self._tel.hit(saved)
             self._emit("hit", label, "cache")
             return QueryResult(_json_rows(served), "cache", self._fp_mode(fp), as_of)
 
         # MISS: capture the fingerprint BEFORE executing (proven serve ordering).
         fp_val = self._cache.fingerprint(fp, self._qconn)
-        rows = self._execute(sql)
+        rows, ms = self._execute(sql)
         self._cache.store_[sql] = (rows, fp_val)
+        self._live_ms[sql] = ms            # remember cost so future hits can credit it
         self._stats["misses"] += 1
+        self._stats["db_ms_spent"] += ms
+        if prior:
+            self._stats["invalidations"] += 1
+        self._tel.miss(ms, invalidated=prior)
         self._emit("recompute" if prior else "cold", label, "live")
         return QueryResult(_json_rows(rows), "live", self._fp_mode(fp), as_of)
 
@@ -157,15 +175,25 @@ class Cartograph:
                 "footprint": footprint}
 
     def stats(self):
-        cacheable = self._stats["hits"] + self._stats["misses"]
+        s = self._stats
+        cacheable = s["hits"] + s["misses"]
+        live_runs = s["misses"] + s["refused"]
+        saved, spent = s["db_ms_saved"], s["db_ms_spent"]
+        total = saved + spent
         return {
-            "queries": self._stats["queries"],
-            "hits": self._stats["hits"],
-            "misses": self._stats["misses"],
-            "refused": self._stats["refused"],
-            "hit_rate": round(self._stats["hits"] / cacheable, 4) if cacheable else 0.0,
-            "refusals_by_reason": dict(self._stats["refusals_by_reason"]),
-            "stale_count": self._stats["stale_count"],   # 0 by construction
+            "queries": s["queries"],
+            "hits": s["hits"],
+            "misses": s["misses"],
+            "refused": s["refused"],
+            "invalidations": s["invalidations"],
+            "hit_rate": round(s["hits"] / cacheable, 4) if cacheable else 0.0,
+            "refusals_by_reason": dict(s["refusals_by_reason"]),
+            "stale_count": s["stale_count"],          # 0 by construction
+            # estimated compute avoided by serving from cache instead of re-executing
+            "db_ms_saved": round(saved, 1),
+            "db_ms_spent": round(spent, 1),
+            "compute_reduction": round(saved / total, 4) if total else 0.0,
+            "avg_live_ms": round(spent / live_runs, 2) if live_runs else 0.0,
         }
 
     # ---- introspection (for the dashboard / "map the DB") ----
