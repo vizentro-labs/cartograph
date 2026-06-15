@@ -1,5 +1,9 @@
 # Cartograph
 
+[![CI](https://github.com/vizentro-labs/cartograph/actions/workflows/ci.yml/badge.svg)](https://github.com/vizentro-labs/cartograph/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/vizentro-labs/cartograph/actions/workflows/codeql.yml/badge.svg)](https://github.com/vizentro-labs/cartograph/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 **Connect your Postgres. Your agent's answers are never stale.**
 
 Cartograph is a never-stale result cache for AI agents that query Postgres. It

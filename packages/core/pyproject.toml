@@ -35,6 +35,10 @@ packages = ["src/cartograph"]
 line-length = 100
 target-version = "py310"
 
+[tool.ruff.lint]
+# the core deliberately uses compact `a; b` setup lines (conn; cursor) — keep them
+ignore = ["E702"]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]

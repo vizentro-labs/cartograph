@@ -1,0 +1,60 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - name: ruff
+        working-directory: packages/core
+        run: ruff check src
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Start Postgres (wal_level=logical)
+        run: |
+          docker run -d --name pg \
+            -e POSTGRES_PASSWORD=postgres -p 5432:5432 \
+            postgres:16 -c wal_level=logical
+          for i in $(seq 1 30); do
+            docker exec pg pg_isready -U postgres && break
+            sleep 1
+          done
+
+      - name: Install core
+        run: pip install -e "packages/core[dev]"
+
+      - name: Integration test (MCP facade, expect 0 stale)
+        working-directory: packages/core
+        env:
+          CARTOGRAPH_DSN: host=localhost port=5432 dbname=postgres user=postgres password=postgres
+        run: pytest -q
+
+      - name: Differential fuzzer (reduced, expect 0 stale)
+        working-directory: packages/core
+        env:
+          CARTOGRAPH_DSN: host=localhost port=5432 dbname=postgres user=postgres password=postgres
+        run: python benchmarks/ci_fuzz.py
