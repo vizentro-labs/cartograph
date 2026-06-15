@@ -1,5 +1,5 @@
 """
-Provisioner — "connect a DSN and go".
+Provisioner: "connect a DSN and go".
 
 `provision(dsn)` idempotently sets up Cartograph's change-capture infra on an
 EXISTING database without touching your data:
@@ -8,7 +8,7 @@ EXISTING database without touching your data:
   - a logical replication slot (plugin=test_decoding)
 
 The one thing it cannot do on a database it doesn't own is flip `wal_level`
-(needs a restart) — it detects that and tells you exactly what to run, tailored
+(needs a restart); it detects that and tells you exactly what to run, tailored
 to your provider (RDS/Aurora, Cloud SQL, self-hosted).
 
 `cartograph-doctor [DSN]` runs it and prints a readiness report.
@@ -150,12 +150,12 @@ def doctor(dsn=None, slot=None):
     """Provision (idempotent) + print a readiness report. Returns ready bool."""
     dsn = dsn or os.environ.get("CARTOGRAPH_DSN") or config.DSN
     slot = slot or config.SLOT
-    print(f"\n  cartograph doctor — {dsn}\n  {'-'*52}")
+    print(f"\n  cartograph doctor: {dsn}\n  {'-'*52}")
     prov = provision(dsn, slot=slot)
     pre = preflight(dsn, slot=slot)
 
     def mark(ok):
-        return "\033[32m✓\033[0m" if ok else "\033[31m✗\033[0m"
+        return "\033[32mok\033[0m" if ok else "\033[31mXX\033[0m"
 
     print(f"  {mark(pre['wal_ok'])} wal_level = {pre['wal_level']}"
           + ("" if pre["wal_ok"] else "   <-- the one manual step"))
@@ -165,7 +165,7 @@ def doctor(dsn=None, slot=None):
     ri = pre["replica_identity"]
     print(f"  {mark(bool(ri) and all(ri.values()))} replica identity full "
           f"({sum(ri.values())}/{len(ri)} tables)")
-    print(f"  · provider: {pre['provider']} · tracking {len(pre['tables'])} tables")
+    print(f"  provider: {pre['provider']} - tracking {len(pre['tables'])} tables")
 
     if prov["created"]:
         print("\n  provisioned:")
@@ -180,7 +180,7 @@ def doctor(dsn=None, slot=None):
         for x in prov["errors"]:
             print(f"    x {x}")
 
-    print(f"\n  {'READY — connect an agent and go.' if pre['ready'] else 'NOT READY — see action above.'}\n")
+    print(f"\n  {'READY: connect an agent and go.' if pre['ready'] else 'NOT READY: see action above.'}\n")
     return pre["ready"]
 
 
