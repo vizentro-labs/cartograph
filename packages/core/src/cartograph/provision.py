@@ -184,8 +184,41 @@ def doctor(dsn=None, slot=None):
     return pre["ready"]
 
 
+USAGE = """\
+cartograph-doctor: set up an EXISTING Postgres for Cartograph.
+Idempotent and non-destructive: it only ever creates a slot, a DDL trigger, and a
+metadata table, and sets REPLICA IDENTITY. It never writes your data tables.
+
+Usage:
+  cartograph-doctor [DSN]
+  cartograph-doctor --help
+
+Arguments:
+  DSN    libpq connection string, e.g. "postgres://user@host:5432/dbname".
+         If omitted, falls back to $CARTOGRAPH_DSN.
+
+Checks / provisions:
+  - wal_level = logical          (the one thing we can't set on a DB we don't own)
+  - a logical replication slot   (plugin: test_decoding)
+  - a DDL event trigger
+  - REPLICA IDENTITY FULL         (per-column invalidation precision)
+
+Environment:
+  CARTOGRAPH_DSN    default DSN if none is given
+  CARTOGRAPH_SLOT   replication slot name (default: cg)
+"""
+
+
 def cli():
-    dsn = sys.argv[1] if len(sys.argv) > 1 else None
+    args = sys.argv[1:]
+    if any(a in ("-h", "--help") for a in args):
+        print(USAGE)
+        sys.exit(0)
+    dsn = args[0] if args else None
+    if dsn is None and not os.environ.get("CARTOGRAPH_DSN"):
+        print(USAGE)
+        print("error: no DSN given and $CARTOGRAPH_DSN is not set")
+        sys.exit(2)
     ok = doctor(dsn)
     sys.exit(0 if ok else 1)
 
