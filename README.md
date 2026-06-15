@@ -87,18 +87,6 @@ bind it to localhost or put it behind your own gateway.
    refuses, never narrows. That makes zero-stale a property by construction; the
    fuzzer's job is to confirm the footprints are real supersets.
 
-## Honest limits
-
-- **Never-stale is unconditional; the savings are workload-dependent.**
-  Read-heavy workloads win big; a hot table under constant writes correctly
-  invalidates and saves little (that's the conservatism working, not a bug).
-- **Setup is real:** `wal_level=logical` plus a replication slot you must monitor
-  (an abandoned slot retains WAL and can fill the disk). `REPLICA IDENTITY FULL`
-  buys per-column precision; without it invalidation is coarser but still
-  zero-stale.
-- CTEs and derived tables use a coarse-but-sound fallback (99% of the 103 TPC-DS
-  queries are cacheable); views are refused unless inlined.
-
 ## Layout
 
 | path | what |
