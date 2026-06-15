@@ -69,6 +69,11 @@ Tools: `query(sql)` → `{rows, source, footprint_mode, as_of_lsn}` ·
 `explain(sql)` · `stats()` (`stale_count` is `0` by construction). More in
 [`packages/core/README.md`](packages/core/README.md).
 
+**Prefer a network endpoint?** `cartograph-mcp-http` (needs the `[api]` extra)
+serves the same tools over HTTP/SSE — point your agent at
+`http://host:8765/sse` instead of spawning a local process. No auth is built in;
+bind it to localhost or put it behind your own gateway.
+
 ## How it works
 
 1. **Footprint.** Parse the SQL (sqlglot) and derive the exact set of

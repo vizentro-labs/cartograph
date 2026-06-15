@@ -110,8 +110,46 @@ async def main():
 
 
 def run():
-    """Sync entry point (console_scripts: cartograph-mcp)."""
+    """Sync entry point (console_scripts: cartograph-mcp). Stdio transport."""
     asyncio.run(main())
+
+
+def http_app(sse_path="/sse", message_path="/messages/"):
+    """Build a Starlette ASGI app serving this MCP server over HTTP (SSE transport),
+    so an agent can reach it at a URL instead of spawning a local stdio process.
+
+    Intentionally NO auth or multi-tenant routing here — that belongs in the
+    managed control plane. Self-host this behind your own gateway, or bind it to
+    localhost. The exposed tools (query/explain/stats) are the same as stdio."""
+    from mcp.server.sse import SseServerTransport
+    from starlette.applications import Starlette
+    from starlette.responses import Response
+    from starlette.routing import Route, Mount
+
+    sse = SseServerTransport(message_path)
+
+    async def handle_sse(request):
+        async with sse.connect_sse(request.scope, request.receive, request._send) as (r, w):
+            await server.run(r, w, server.create_initialization_options())
+        return Response()        # SSE stream already sent; satisfy Starlette's Route
+
+    return Starlette(routes=[
+        Route(sse_path, endpoint=handle_sse),
+        Mount(message_path, app=sse.handle_post_message),
+    ])
+
+
+def run_http():
+    """Console entry (cartograph-mcp-http): serve the MCP tools over HTTP/SSE.
+    Env: CARTOGRAPH_MCP_HOST (default 127.0.0.1), CARTOGRAPH_MCP_PORT (default 8765)."""
+    try:
+        import uvicorn
+    except ImportError:
+        sys.exit("cartograph-mcp-http needs uvicorn — install with: pip install 'cartograph-cache[api]'")
+    host = os.environ.get("CARTOGRAPH_MCP_HOST", "127.0.0.1")
+    port = int(os.environ.get("CARTOGRAPH_MCP_PORT", "8765"))
+    print(f"Cartograph MCP (SSE) on http://{host}:{port}/sse", file=sys.stderr)
+    uvicorn.run(http_app(), host=host, port=port)
 
 
 if __name__ == "__main__":

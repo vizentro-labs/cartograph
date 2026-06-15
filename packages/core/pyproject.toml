@@ -24,6 +24,7 @@ dev = ["pytest>=8", "ruff>=0.5", "fastapi>=0.110", "uvicorn>=0.27"]
 
 [project.scripts]
 cartograph-mcp = "cartograph.mcp_server:run"
+cartograph-mcp-http = "cartograph.mcp_server:run_http"
 cartograph-api = "cartograph.api:run"
 cartograph-doctor = "cartograph.provision:cli"
 
