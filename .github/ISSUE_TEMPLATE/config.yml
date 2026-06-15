@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability (report privately)
+    url: https://github.com/vizentro-labs/cartograph/security/policy
+    about: Do not file a public issue for security problems — including any way to make Cartograph serve a stale answer. See the security policy.

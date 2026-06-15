@@ -1,0 +1,50 @@
+name: Bug report
+description: Something is wrong — including the worst kind, a stale answer.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. **If Cartograph served a stale answer** — a cache hit
+        that disagreed with a live query at its reported `as_of_lsn` — that is the
+        highest-severity bug. Please report it privately via the
+        [security policy](https://github.com/vizentro-labs/cartograph/security/policy),
+        not here, and include a repro if you can.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you actually get?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Ideally a minimal sequence of queries / writes. A `benchmarks/fuzz_postgres.py`-style repro is gold.
+    validations:
+      required: true
+  - type: input
+    id: sql
+    attributes:
+      label: Query involved (if any)
+      description: The SQL, and whether it was served from `cache` or `live`.
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Versions and config.
+      placeholder: |
+        cartograph: 0.1.0
+        python: 3.12
+        postgres: 16
+        mode: coarse | lineage
+        REPLICA IDENTITY FULL: yes / no
+    validations:
+      required: true
+  - type: checkboxes
+    id: severity
+    attributes:
+      label: Correctness
+      options:
+        - label: This was a STALE answer (a cache hit that differed from the live database)
