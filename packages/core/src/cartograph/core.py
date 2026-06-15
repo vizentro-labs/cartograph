@@ -15,8 +15,8 @@ from dataclasses import dataclass, asdict
 from decimal import Decimal
 
 from . import config
-from .runtime import (WalVersions, Cache, read_schema, on_schema_change,
-                      conn, bootstrap as _bootstrap, discover_tables_pk)
+from .runtime import Cache
+from .change_source import ChangeSource, PostgresChangeSource
 
 
 @dataclass
@@ -45,25 +45,28 @@ def _json_rows(rows):
 class Cartograph:
     """Never-stale SQL result cache over a real Postgres."""
 
-    def __init__(self, dsn=None, mode=None, slot=None, discover=True):
+    def __init__(self, dsn=None, mode=None, slot=None, discover=True, source=None):
         if dsn:
             config.DSN = dsn
         if mode:
             config.MODE = mode
         if slot:
             config.SLOT = slot
+        # The engine adapter. Defaults to Postgres; pass a different ChangeSource
+        # to cache over another engine (see change_source.py / the design doc).
+        self._src: ChangeSource = source or PostgresChangeSource()
         if discover:
             try:
-                tables, pk = discover_tables_pk()
+                tables, pk = self._src.discover_tables_pk()
                 if tables:
                     config.TABLES, config.PK = tables, pk
             except Exception:
                 pass                       # keep configured defaults
         self.dsn = config.DSN
         self.mode = config.MODE
-        self._ver = WalVersions()          # WAL reader (its own connection)
-        self._cache = Cache(self._ver, read_schema())
-        self._qconn = conn()               # query connection
+        self._ver = self._src.new_version_tracker()   # change-stream version tracker
+        self._cache = Cache(self._ver, self._src.read_schema())
+        self._qconn = self._src.query_connection()    # query connection
         self._stats = {"queries": 0, "hits": 0, "misses": 0, "refused": 0,
                        "refusals_by_reason": {}, "stale_count": 0}
         self._events = deque(maxlen=200)   # invalidation / serve feed for the dashboard
@@ -78,7 +81,7 @@ class Cartograph:
     @staticmethod
     def bootstrap():
         """(Re)create the demo schema + WAL slot + DDL trigger (admin step)."""
-        _bootstrap()
+        PostgresChangeSource().provision_demo()
 
     def close(self):
         try:
@@ -90,15 +93,13 @@ class Cartograph:
     def _refresh(self):
         self._ver.drain()                  # synchronous drain to current LSN
         if self._ver.schema_dirty:
-            changed, n = on_schema_change(self._cache, self._ver)
+            changed, n = self._src.on_schema_change(self._cache, self._ver)
             if changed:
                 self._emit("schema", f"DDL on {', '.join(sorted(changed))}; "
                            f"invalidated {n}", "recompute")
 
     def _lsn(self):
-        cur = self._qconn.cursor()
-        cur.execute("SELECT pg_current_wal_lsn()::text")
-        return cur.fetchone()[0]
+        return self._src.current_position(self._qconn)
 
     def _fp_mode(self, fp):
         return "row" if fp[0] == "row" else self.mode
